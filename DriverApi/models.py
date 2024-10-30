@@ -26,7 +26,7 @@ class Driver(AbstractBaseUser):
     user = models.OneToOneField(User, on_delete=models.CASCADE,default="1")
     first_name = models.CharField(max_length=80)
     last_name = models.CharField(max_length=80)
-    email = models.EmailField(unique=True)
+    email = models.EmailField()
     password = models.CharField(max_length=200)
     number = models.IntegerField(unique=True)
     auto_no = models.CharField(max_length=80, unique=True, null=False, blank=False)

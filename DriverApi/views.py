@@ -118,24 +118,7 @@ class UpdateDriverLocation(APIView):
             return Response({"message": "Driver location created successfully"}, status=status.HTTP_201_CREATED)
 
 
-    def post(self, request):
-        data = request.data.copy()
-        driver_id = data.get('driver')
-
-        # Check if a driver with this ID exists
-        try:
-            driver_instance = Driver.objects.get(id=driver_id)
-        except Driver.DoesNotExist:
-            # If the driver does not exist, create a new location entry
-            location_data = {
-                'driver': driver_id,
-                'location': data.get('location'),  # Assuming you're sending a 'location' field
-            }
-            serializer = DriverLocationSerializer(data=location_data)
-            if serializer.is_valid():
-                serializer.save()
-                return Response({"message": "Driver location created successfully"}, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+   
 
 class DriverRidesHistoryView(APIView):
     def get(self, request):

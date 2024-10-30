@@ -35,6 +35,13 @@ class SignupPassenger(APIView):
         roll_no = request.data.get('roll_no')
         subgroup_year = request.data.get('subgroup_year')
 
+        # Check if email already exists in User
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {"error": "A user with this email already exists."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             # Create the User instance
             user = User.objects.create_user(
@@ -63,6 +70,7 @@ class SignupPassenger(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class LoginPassenger(APIView):
     def post(self, request):

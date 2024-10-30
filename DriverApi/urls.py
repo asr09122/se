@@ -18,7 +18,6 @@ urlpatterns = [
     path('rides-history/', DriverRidesHistoryView.as_view(), name='driver_rides_history'),
     path('complete-ride/', CompleteRide.as_view(), name='complete_ride'),
     path('current-booked-ride/', CurrentBookedRide.as_view(), name='current-booked-ride'),
-    path('current-booked-ride/', CurrentBookedRide.as_view(), name='current-booked-ride'),
     path('Cancel-ride/', CancelRide.as_view(), name='Cancel-Ride'),
 
 ]
