@@ -55,6 +55,8 @@ class SignupPassenger(APIView):
             # Now create the Passenger instance
             passenger = Passenger.objects.create(
                 user=user,
+                first_name=first_name,
+                last_name=last_name,
                 number=number,
                 roll_no=roll_no,
                 subgroup_year=subgroup_year
@@ -88,8 +90,15 @@ class LoginPassenger(APIView):
 class LogoutPassenger(APIView):
     def post(self, request):
         user = authenticate_token(request)
-        Token.objects.get(user=user).delete()  # Delete the token on logout
-        return Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
+        passenger = get_object_or_404(Passenger, user=user)
+
+        try:
+            # Clear any current bookings for the passenger
+            CurrentBooking.objects.filter(passenger=passenger).delete()
+            Token.objects.get(user=user).delete()  # Delete the token on logout
+            return Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 from rest_framework.response import Response
 from rest_framework import status
@@ -149,10 +158,10 @@ class CancelRide(APIView):
 
 class FindNearbyDrivers(APIView):
     def post(self, request):
-        user = authenticate_token(request)  # Authenticate the user
+        user = authenticate_token(request)
         latitude = request.data.get('latitude')
         longitude = request.data.get('longitude')
-        radius = request.data.get('radius', 5)  # Default radius in kilometers
+        radius = request.data.get('radius', 5)
 
         if latitude is None or longitude is None:
             return Response({"error": "Latitude and longitude must be provided."}, status=status.HTTP_400_BAD_REQUEST)
@@ -164,7 +173,9 @@ class FindNearbyDrivers(APIView):
         except ValueError:
             return Response({"error": "Latitude, longitude, and radius must be valid numbers."}, status=status.HTTP_400_BAD_REQUEST)
 
-        nearby_drivers = DriverLocation.objects.filter(
+        # Exclude drivers who have a current booking
+        nearby_drivers = DriverLocation.objects.exclude(driver__in=CurrentBooking.objects.values_list('driver', flat=True))
+        nearby_drivers = nearby_drivers.filter(
             latitude__gte=latitude - radius,
             latitude__lte=latitude + radius,
             longitude__gte=longitude - radius,
@@ -173,7 +184,7 @@ class FindNearbyDrivers(APIView):
 
         serializer = DriverLocationSerializer(nearby_drivers, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
+    
 class TravellerHistoryView(APIView):
     def get(self, request):
         # Authenticate the user

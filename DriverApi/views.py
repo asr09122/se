@@ -5,7 +5,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
-
+from django.shortcuts import get_object_or_404
 from .models import Driver, DriverLocation, DriverRidesHistory, CurrentBooking
 from PassengerApi.models import TravelHistory
 from .serializers import DriverSerializer, DriverLocationSerializer, DriverRidesHistorySerializer, CurrentBookingSerializer
@@ -33,7 +33,7 @@ class SignupDriver(APIView):
 
         try:
             user = User.objects.create_user(
-                username=email,  # Use email as username
+                username=email,
                 first_name=first_name,
                 last_name=last_name,
                 email=email,
@@ -43,7 +43,10 @@ class SignupDriver(APIView):
             driver = Driver.objects.create(
                 user=user,
                 number=number,
-                auto_no=auto_no
+                auto_no=auto_no,
+                first_name=first_name,
+                last_name=last_name,
+                email=email
             )
 
             token, _ = Token.objects.get_or_create(user=user)
@@ -60,10 +63,8 @@ class LoginDriver(APIView):
         email = request.data.get('email')
         password = request.data.get('password')
 
-        # Get the user based on the email
         try:
             user = User.objects.get(email=email)
-            # Authenticate with the user object
             if user.check_password(password):
                 token, _ = Token.objects.get_or_create(user=user)
                 return Response({
@@ -77,79 +78,66 @@ class LoginDriver(APIView):
 
 class LogoutDriver(APIView):
     def post(self, request):
-        user = authenticate_token(request)  
+        user = authenticate_token(request)
+        driver = get_object_or_404(Driver, user=user)
+
         try:
-            user.auth_token.delete()
+            # Clear any current bookings for the driver
+            CurrentBooking.objects.filter(driver=driver).delete()
+            Token.objects.get(user=user).delete()  # Delete the token on logout
             return Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-
-from django.shortcuts import get_object_or_404
-
-
 class UpdateDriverLocation(APIView):
     def put(self, request):
-        # Get the logged-in driver from the request
-        user = authenticate_token(request)  # Assuming this function retrieves the authenticated driver
-        
-        # Ensure user is a Driver instance
-        driver = get_object_or_404(Driver, user=user)  # Assuming Driver has a ForeignKey to User
+        user = authenticate_token(request)
+        driver = get_object_or_404(Driver, user=user)
 
-        # Get the latitude and longitude from the request data
+        # Check if the driver has a current booking
+        if CurrentBooking.objects.filter(driver=driver).exists():
+            return Response({"error": "You cannot update your location while you have a current booking."}, status=status.HTTP_400_BAD_REQUEST)
+
         latitude = request.data.get('latitude')
         longitude = request.data.get('longitude')
 
-        # Check if the latitude and longitude are provided
         if latitude is None or longitude is None:
             return Response({"error": "Latitude and longitude are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check if a DriverLocation entry exists for the logged-in driver
         try:
             driver_location = DriverLocation.objects.get(driver=driver)
-            # Update the existing driver's location
             driver_location.latitude = latitude
             driver_location.longitude = longitude
             driver_location.save()
             return Response({"message": "Driver location updated successfully"}, status=status.HTTP_200_OK)
         except DriverLocation.DoesNotExist:
-            # If no location exists, create a new entry
             DriverLocation.objects.create(driver=driver, latitude=latitude, longitude=longitude)
             return Response({"message": "Driver location created successfully"}, status=status.HTTP_201_CREATED)
-
-
    
 
 class DriverRidesHistoryView(APIView):
     def get(self, request):
-        # Authenticate the user
         user = authenticate_token(request)
 
-        # Get the driver instance associated with the authenticated user
         driver = get_object_or_404(Driver, user=user)
 
-        # Fetch the rides history for the authenticated driver
         rides = DriverRidesHistory.objects.filter(driver=driver)
         
-        # Serialize the rides data
         serializer = DriverRidesHistorySerializer(rides, many=True)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-from django.shortcuts import get_object_or_404
 
 class CompleteRide(APIView):
     def post(self, request):
-        user = authenticate_token(request)  # Get the authenticated user
-        driver = get_object_or_404(Driver, user=user)  # Get the associated Driver instance
+        user = authenticate_token(request)  
+        driver = get_object_or_404(Driver, user=user)
         ride_id = request.data.get('ride_id')
         
         try:
-            # Query using the driver instance instead of the user
             current_booking = CurrentBooking.objects.get(id=ride_id, driver=driver)
             
-            # Create passenger travel history
             passenger_travel_history = TravelHistory(
                 passenger=current_booking.passenger,
                 driver=current_booking.driver,
@@ -160,7 +148,6 @@ class CompleteRide(APIView):
             )
             passenger_travel_history.save()
 
-            # Create driver travel history
             driver_travel_history = DriverRidesHistory(
                 passenger=current_booking.passenger,
                 driver=current_booking.driver,
@@ -172,7 +159,6 @@ class CompleteRide(APIView):
             )
             driver_travel_history.save()
 
-            # Delete the current booking
             current_booking.delete()
 
             return Response({"message": "Ride marked as completed"}, status=status.HTTP_200_OK)
@@ -197,12 +183,10 @@ class CancelRide(APIView):
 
 class CurrentBookedRide(APIView):
     def get(self, request):
-        user = authenticate_token(request)  # Get the authenticated user
+        user = authenticate_token(request) 
 
-        # Get the Driver instance associated with the user
         driver = get_object_or_404(Driver, user=user)
 
-        # Use the driver instance to filter current rides
         current_rides = CurrentBooking.objects.filter(driver=driver)
 
         if current_rides.exists():
