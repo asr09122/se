@@ -1,2 +1,19 @@
-node_modules/
+# Python / Pycache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# Database / Local files
+db.sqlite3
+*.log
+
+# Environment variables
 .env
+
+# Node
+node_modules/

@@ -43,8 +43,6 @@ class Driver(AbstractBaseUser):
     objects = DriverManager()
     
     def save(self, *args, **kwargs):
-        if not self.pk or self.password != Driver.objects.get(pk=self.pk).password:
-            self.password = make_password(self.password)
         super().save(*args, **kwargs)
     
     def check_password(self, password):
@@ -91,23 +89,11 @@ class CurrentBooking(models.Model):
     """
     Stores current bookings for drivers, which can later be moved to ride history.
     """
-    id = models.IntegerField(primary_key=True, editable=False)  # Set primary key explicitly
     passenger = models.ForeignKey('PassengerApi.Passenger', on_delete=models.CASCADE)
     driver = models.ForeignKey(Driver, on_delete=models.CASCADE)
     source_address = models.TextField()
     destination_address = models.TextField()
     booked_time = models.DateTimeField(auto_now_add=True)
-
-    def save(self, *args, **kwargs):
-        if not self.id:  # Only set id if it's a new record
-            # Find the smallest available ID starting from 1
-            all_ids = CurrentBooking.objects.values_list('id', flat=True)
-            for potential_id in range(1, len(all_ids) + 2):
-                if potential_id not in all_ids:
-                    self.id = potential_id
-                    break
-
-        super(CurrentBooking, self).save(*args, **kwargs)
 
     def __str__(self):
         return f"Current Booking for {self.passenger} with {self.driver}"

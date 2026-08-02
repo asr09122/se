@@ -57,6 +57,7 @@ class SignupPassenger(APIView):
                 user=user,
                 first_name=first_name,
                 last_name=last_name,
+                email=email,
                 number=number,
                 roll_no=roll_no,
                 subgroup_year=subgroup_year

@@ -17,8 +17,6 @@ class Passenger(models.Model):
 
 
     def save(self, *args, **kwargs):
-        # Hash the password before saving
-        self.password = make_password(self.password)
         super().save(*args, **kwargs)
 
     def check_password(self, password):
